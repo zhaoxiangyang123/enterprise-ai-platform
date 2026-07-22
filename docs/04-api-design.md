@@ -425,3 +425,301 @@ Authorization: Bearer <access_token>
 | `jti`      | 令牌唯一编号 |
 
 权限明细不直接全部写入 JWT。具体权限由用户服务管理，避免用户权限调整后，旧令牌长期保留过期权限。
+
+## 4. AI 问答接口
+
+### 4.1 创建会话
+
+**接口地址**
+
+```http
+POST /api/conversations
+```
+
+**是否需要登录**
+
+是。
+
+**请求参数**
+
+```json
+{
+  "title": "Java 并发问题",
+  "knowledgeBaseId": null
+}
+```
+
+| 字段              | 类型   | 必填 | 说明                           |
+| ----------------- | ------ | ---- | ------------------------------ |
+| `title`           | String | 否   | 会话标题，不传时由系统自动生成 |
+| `knowledgeBaseId` | Long   | 否   | 知识库编号，第一迭代允许为空   |
+
+**成功响应**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "会话创建成功",
+  "data": {
+    "conversationId": 30001,
+    "title": "Java 并发问题",
+    "createdAt": "2026-07-22T15:30:00+08:00"
+  },
+  "requestId": "01J2ABCDEF123456789",
+  "timestamp": 1750000000000
+}
+```
+
+------
+
+### 4.2 发起 AI 问答
+
+**接口地址**
+
+```http
+POST /api/ai/chat
+```
+
+**是否需要登录**
+
+是。
+
+**权限要求**
+
+```text
+ai:chat
+```
+
+**请求参数**
+
+```json
+{
+  "conversationId": 30001,
+  "message": "请解释一下 Java 线程池的核心参数。",
+  "stream": true
+}
+```
+
+| 字段             | 类型    | 必填 | 说明                              |
+| ---------------- | ------- | ---- | --------------------------------- |
+| `conversationId` | Long    | 是   | 会话编号                          |
+| `message`        | String  | 是   | 用户问题，长度为 1～5000 个字符   |
+| `stream`         | Boolean | 否   | 是否使用流式输出，默认值为 `true` |
+
+**请求头**
+
+```http
+Authorization: Bearer <access_token>
+Content-Type: application/json
+Accept: text/event-stream
+```
+
+------
+
+### 4.3 SSE 流式响应
+
+流式接口使用：
+
+```http
+Content-Type: text/event-stream
+```
+
+每个事件包含事件类型和 JSON 数据。
+
+#### 开始事件
+
+```text
+event: start
+data: {"conversationId":30001,"messageId":40002}
+```
+
+#### 内容事件
+
+```text
+event: delta
+data: {"content":"Java 线程池主要包含"}
+event: delta
+data: {"content":"核心线程数、最大线程数、"}
+event: delta
+data: {"content":"任务队列和拒绝策略等参数。"}
+```
+
+#### 完成事件
+
+```text
+event: done
+data: {"messageId":40002,"finishReason":"stop"}
+```
+
+#### 错误事件
+
+```text
+event: error
+data: {"code":"AI_REQUEST_FAILED","message":"AI 服务调用失败"}
+```
+
+前端收到 `done` 事件后结束本次流式读取。
+
+------
+
+### 4.4 非流式响应
+
+当请求参数中的 `stream` 为 `false` 时，接口返回普通 JSON：
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "回答生成成功",
+  "data": {
+    "conversationId": 30001,
+    "userMessageId": 40001,
+    "assistantMessageId": 40002,
+    "content": "Java 线程池主要包含核心线程数、最大线程数、任务队列和拒绝策略等参数。",
+    "finishReason": "stop",
+    "createdAt": "2026-07-22T15:31:00+08:00"
+  },
+  "requestId": "01J2ABCDEF123456789",
+  "timestamp": 1750000000000
+}
+```
+
+------
+
+### 4.5 查询会话列表
+
+**接口地址**
+
+```http
+GET /api/conversations?pageNum=1&pageSize=20
+```
+
+**是否需要登录**
+
+是。
+
+用户只能查询自己的会话记录。
+
+**成功响应**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "操作成功",
+  "data": {
+    "list": [
+      {
+        "conversationId": 30001,
+        "title": "Java 并发问题",
+        "messageCount": 6,
+        "updatedAt": "2026-07-22T15:31:00+08:00"
+      }
+    ],
+    "pageNum": 1,
+    "pageSize": 20,
+    "total": 1,
+    "pages": 1
+  },
+  "requestId": "01J2ABCDEF123456789",
+  "timestamp": 1750000000000
+}
+```
+
+------
+
+### 4.6 查询会话消息
+
+**接口地址**
+
+```http
+GET /api/conversations/{conversationId}/messages
+```
+
+**是否需要登录**
+
+是。
+
+**成功响应**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "操作成功",
+  "data": [
+    {
+      "messageId": 40001,
+      "role": "USER",
+      "content": "请解释一下 Java 线程池的核心参数。",
+      "createdAt": "2026-07-22T15:30:30+08:00"
+    },
+    {
+      "messageId": 40002,
+      "role": "ASSISTANT",
+      "content": "Java 线程池主要包含核心线程数、最大线程数、任务队列和拒绝策略等参数。",
+      "createdAt": "2026-07-22T15:31:00+08:00"
+    }
+  ],
+  "requestId": "01J2ABCDEF123456789",
+  "timestamp": 1750000000000
+}
+```
+
+------
+
+### 4.7 删除会话
+
+**接口地址**
+
+```http
+DELETE /api/conversations/{conversationId}
+```
+
+**是否需要登录**
+
+是。
+
+用户只能删除自己的会话。
+
+**成功响应**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "会话删除成功",
+  "data": null,
+  "requestId": "01J2ABCDEF123456789",
+  "timestamp": 1750000000000
+}
+```
+
+------
+
+### 4.8 AI 问答失败场景
+
+| 场景               | HTTP 状态码 | 错误码                   |
+| ------------------ | ----------- | ------------------------ |
+| 问题内容为空       | 400         | `PARAM_INVALID`          |
+| 会话不存在         | 404         | `CONVERSATION_NOT_FOUND` |
+| 会话不属于当前用户 | 403         | `ACCESS_DENIED`          |
+| 没有 AI 问答权限   | 403         | `ACCESS_DENIED`          |
+| 大模型暂时不可用   | 503         | `AI_MODEL_UNAVAILABLE`   |
+| 大模型调用失败     | 500         | `AI_REQUEST_FAILED`      |
+| 请求频率过高       | 429         | `AI_RATE_LIMITED`        |
+
+------
+
+### 4.9 第一迭代实现说明
+
+第一迭代只调用大语言模型完成基础问答，不执行知识库检索。
+
+接口结构提前保留以下扩展能力：
+
+- 接入知识库编号。
+- 引用知识来源。
+- Token 使用量统计。
+- 模型信息记录。
+- Prompt 模板管理。
+- RAG 检索结果。
+- Agent 工具调用过程。
+- MCP 工具执行结果。
+
+后续增加这些能力时，前端的核心调用方式不需要大幅调整。
