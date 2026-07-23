@@ -1,0 +1,100 @@
+name: ${COMPOSE_PROJECT_NAME:-enterprise-ai-platform-local}
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE}
+    container_name: eap-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_APP_USER: ${MYSQL_APP_USER}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "${MYSQL_PORT}:3306"
+    volumes:
+      - eap-mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - eap-local
+
+  redis:
+    image: ${REDIS_IMAGE}
+    container_name: eap-redis
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - eap-redis-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - eap-local
+
+  nacos:
+    image: ${NACOS_IMAGE}
+    container_name: eap-nacos
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_CONSOLE_PORT: "8080"
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "${NACOS_CONSOLE_PORT}:8080"
+      - "${NACOS_SERVER_PORT}:8848"
+      - "${NACOS_GRPC_PORT}:9848"
+    volumes:
+      - eap-nacos-logs:/home/nacos/logs
+      - eap-nacos-data:/home/nacos/data
+    networks:
+      - eap-local
+
+volumes:
+  eap-mysql-data:
+  eap-redis-data:
+  eap-nacos-logs:
+  eap-nacos-data:
+
+networks:
+  eap-local:
+    name: eap-local
+    driver: bridge
