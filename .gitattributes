@@ -1,0 +1,7 @@
+# Keep container scripts Linux-compatible
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sql text eol=lf
+*.cnf text eol=lf
+*.ps1 text eol=crlf
