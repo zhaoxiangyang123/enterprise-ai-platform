@@ -1,7 +1,10 @@
-# Keep container scripts Linux-compatible
+* text=auto
+
+.gitattributes text eol=lf
 *.sh text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.sql text eol=lf
-*.cnf text eol=lf
+*.md text eol=lf
+.env.example text eol=lf
 *.ps1 text eol=crlf

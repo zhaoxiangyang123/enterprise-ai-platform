@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$Start
 )
 
@@ -36,14 +36,16 @@ function Write-Utf8NoBom {
 Write-Host "开始生成本地基础设施文件..."
 
 Write-Utf8NoBom -RelativePath '.gitattributes' -Content @'
-# Keep container scripts Linux-compatible
+* text=auto
+
+.gitattributes text eol=lf
 *.sh text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.sql text eol=lf
-*.cnf text eol=lf
+*.md text eol=lf
+.env.example text eol=lf
 *.ps1 text eol=crlf
-
 '@ -LinuxLineEndings
 
 Write-Utf8NoBom -RelativePath 'deploy\local\.env.example' -Content @'
@@ -52,7 +54,7 @@ COMPOSE_PROJECT_NAME=enterprise-ai-platform-local
 TZ=Asia/Shanghai
 
 MYSQL_IMAGE=mysql:8.4.10
-MYSQL_PORT=3306
+MYSQL_PORT=13306
 MYSQL_ROOT_PASSWORD=EapRoot_2026_Local
 MYSQL_APP_USER=eap
 MYSQL_APP_PASSWORD=EapApp_2026_Local
@@ -62,14 +64,13 @@ REDIS_PORT=6379
 REDIS_PASSWORD=EapRedis_2026_Local
 
 NACOS_IMAGE=nacos/nacos-server:v3.2.3
-NACOS_CONSOLE_PORT=8080
+NACOS_CONSOLE_PORT=8849
 NACOS_SERVER_PORT=8848
 NACOS_GRPC_PORT=9848
 
 NACOS_AUTH_TOKEN=RW50ZXJwcmlzZS1BSS1QbGF0Zm9ybS1Mb2NhbC1EZXZlbG9wbWVudC1Ub2tlbi0yMDI2
 NACOS_AUTH_IDENTITY_KEY=eap-local-server
 NACOS_AUTH_IDENTITY_VALUE=eap-local-server-value
-
 '@
 
 Write-Utf8NoBom -RelativePath 'deploy\local\docker-compose.yml' -Content @'
@@ -91,12 +92,13 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+08:00
+      - --max-connections=300
+      - --skip-name-resolve
     ports:
       - "${MYSQL_PORT}:3306"
     volumes:
       - eap-mysql-data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
-      - ./mysql/conf.d:/etc/mysql/conf.d:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -145,6 +147,7 @@ services:
     environment:
       MODE: standalone
       PREFER_HOST_MODE: hostname
+      NACOS_CONSOLE_PORT: "8080"
       NACOS_AUTH_ENABLE: "true"
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
       NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
@@ -172,7 +175,6 @@ networks:
   eap-local:
     name: eap-local
     driver: bridge
-
 '@ -LinuxLineEndings
 
 Write-Utf8NoBom -RelativePath 'deploy\local\mysql\init\01-init-databases.sh' -Content @'
@@ -202,20 +204,6 @@ FLUSH PRIVILEGES;
 EOSQL
 
 echo "[mysql-init] Databases eap_user and eap_ai are ready."
-
-'@ -LinuxLineEndings
-
-Write-Utf8NoBom -RelativePath 'deploy\local\mysql\conf.d\eap.cnf' -Content @'
-[mysqld]
-character-set-server=utf8mb4
-collation-server=utf8mb4_unicode_ci
-default-time-zone=+08:00
-max_connections=300
-skip-name-resolve=ON
-
-[client]
-default-character-set=utf8mb4
-
 '@ -LinuxLineEndings
 
 Write-Utf8NoBom -RelativePath 'deploy\local\README.md' -Content @'
@@ -229,15 +217,23 @@ Local dependencies for the first iteration:
 
 ## Ports
 
-| Component | Address |
+The committed defaults are shown below. A developer can override them in
+`deploy/local/.env`.
+
+| Component | Default address |
 |---|---|
-| MySQL | `127.0.0.1:3306` |
+| MySQL | `127.0.0.1:13306` |
 | Redis | `127.0.0.1:6379` |
 | Nacos server | `127.0.0.1:8848` |
 | Nacos console | `http://127.0.0.1:8849` |
 | Nacos gRPC | `127.0.0.1:9848` |
 
-Nacos uses host port 8849 for its console because gateway-service uses 8080.
+The MySQL host port uses `13306` so it can coexist with a MySQL installation
+using the conventional host port `3306`.
+
+Nacos uses host port `8849` for its console. Inside the Nacos container the
+console listens on port `8080`; this does not conflict with the gateway running
+on the Windows host.
 
 ## Commands
 
@@ -248,17 +244,32 @@ Nacos uses host port 8849 for its console because gateway-service uses 8080.
 .\scripts\stop-infrastructure.ps1
 ```
 
+View one service's logs:
+
+```powershell
+.\scripts\logs-infrastructure.ps1 -Service mysql -Tail 100
+```
+
 Delete all local data:
 
 ```powershell
 .\scripts\stop-infrastructure.ps1 -DeleteData
 ```
 
-The first startup copies `.env.example` to `.env`. `.env` is ignored by Git.
+The first startup copies `.env.example` to `.env`. The real `.env` is ignored
+by Git.
 
-Local Nacos uses standalone embedded storage for development only. A later deployment stage will move it to authenticated cluster mode with external persistent storage.
+## MySQL configuration
 
-'@
+MySQL development settings are passed as container startup arguments rather
+than through a Windows bind-mounted `.cnf` file. This avoids the Linux
+`world-writable config file ... is ignored` warning caused by Windows-mounted
+file permissions.
+
+Local Nacos uses standalone embedded storage for development only. A later
+deployment stage will move it to authenticated cluster mode with external
+persistent storage.
+'@ -LinuxLineEndings
 
 Write-Utf8NoBom -RelativePath 'scripts\start-infrastructure.ps1' -Content @'
 $ErrorActionPreference = "Stop"
@@ -291,8 +302,46 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
+$EnvValues = Read-DotEnv -Path $EnvFile
+$NacosConsolePort = Get-EnvValue -Values $EnvValues -Name "NACOS_CONSOLE_PORT" -DefaultValue "8849"
 
 Push-Location $DeployDirectory
 try {
@@ -313,12 +362,11 @@ try {
 
     Write-Host ""
     Write-Host "首次下载和初始化可能需要数分钟。"
-    Write-Host "Nacos 控制台：http://127.0.0.1:8849"
+    Write-Host "Nacos 控制台：http://127.0.0.1:$NacosConsolePort"
 }
 finally {
     Pop-Location
 }
-
 '@
 
 Write-Utf8NoBom -RelativePath 'scripts\stop-infrastructure.ps1' -Content @'
@@ -356,6 +404,42 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
 
@@ -376,7 +460,6 @@ try {
 finally {
     Pop-Location
 }
-
 '@
 
 Write-Utf8NoBom -RelativePath 'scripts\status-infrastructure.ps1' -Content @'
@@ -410,26 +493,86 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
+$EnvValues = Read-DotEnv -Path $EnvFile
+
+$Ports = @(
+    @{
+        Name = "MySQL"
+        Port = [int](Get-EnvValue -Values $EnvValues -Name "MYSQL_PORT" -DefaultValue "13306")
+    },
+    @{
+        Name = "Redis"
+        Port = [int](Get-EnvValue -Values $EnvValues -Name "REDIS_PORT" -DefaultValue "6379")
+    },
+    @{
+        Name = "Nacos Server"
+        Port = [int](Get-EnvValue -Values $EnvValues -Name "NACOS_SERVER_PORT" -DefaultValue "8848")
+    },
+    @{
+        Name = "Nacos Console"
+        Port = [int](Get-EnvValue -Values $EnvValues -Name "NACOS_CONSOLE_PORT" -DefaultValue "8849")
+    },
+    @{
+        Name = "Nacos gRPC"
+        Port = [int](Get-EnvValue -Values $EnvValues -Name "NACOS_GRPC_PORT" -DefaultValue "9848")
+    }
+)
 
 Push-Location $DeployDirectory
 try {
     & docker compose --env-file $EnvFile -f $ComposeFile ps
+    if ($LASTEXITCODE -ne 0) {
+        throw "无法读取基础设施容器状态。"
+    }
 
     Write-Host ""
     Write-Host "端口检查："
 
-    $Ports = @(
-        @{ Name = "MySQL"; Port = 3306 },
-        @{ Name = "Redis"; Port = 6379 },
-        @{ Name = "Nacos Server"; Port = 8848 },
-        @{ Name = "Nacos Console"; Port = 8849 },
-        @{ Name = "Nacos gRPC"; Port = 9848 }
-    )
-
     foreach ($Item in $Ports) {
-        $Open = Test-NetConnection -ComputerName "127.0.0.1" -Port $Item.Port -InformationLevel Quiet -WarningAction SilentlyContinue
+        $Open = Test-NetConnection `
+            -ComputerName "127.0.0.1" `
+            -Port $Item.Port `
+            -InformationLevel Quiet `
+            -WarningAction SilentlyContinue
+
         $State = if ($Open) { "OPEN" } else { "CLOSED" }
         Write-Host ("{0,-14} {1,-5} {2}" -f $Item.Name, $Item.Port, $State)
     }
@@ -437,7 +580,6 @@ try {
 finally {
     Pop-Location
 }
-
 '@
 
 Write-Utf8NoBom -RelativePath 'scripts\logs-infrastructure.ps1' -Content @'
@@ -445,6 +587,7 @@ param(
     [ValidateSet("all", "mysql", "redis", "nacos")]
     [string]$Service = "all",
 
+    [ValidateRange(1, 10000)]
     [int]$Tail = 200
 )
 
@@ -478,6 +621,42 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
 
@@ -489,12 +668,27 @@ try {
     else {
         & docker compose --env-file $EnvFile -f $ComposeFile logs --tail $Tail -f $Service
     }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "读取基础设施日志失败。"
+    }
 }
 finally {
     Pop-Location
 }
-
 '@
+
+$LegacyMySqlConfig = Join-Path $ProjectRoot "deploy\local\mysql\conf.d\eap.cnf"
+if (Test-Path $LegacyMySqlConfig) {
+    Remove-Item $LegacyMySqlConfig -Force
+    Write-Host "REMOVED  deploy\local\mysql\conf.d\eap.cnf"
+}
+
+$LegacyConfigDirectory = Split-Path $LegacyMySqlConfig -Parent
+if ((Test-Path $LegacyConfigDirectory) -and
+    -not (Get-ChildItem $LegacyConfigDirectory -Force | Select-Object -First 1)) {
+    Remove-Item $LegacyConfigDirectory -Force
+}
 
 $EnvExample = Join-Path $ProjectRoot "deploy\local\.env.example"
 $EnvFile = Join-Path $ProjectRoot "deploy\local\.env"
