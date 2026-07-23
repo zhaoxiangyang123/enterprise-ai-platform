@@ -28,8 +28,46 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
+$EnvValues = Read-DotEnv -Path $EnvFile
+$NacosConsolePort = Get-EnvValue -Values $EnvValues -Name "NACOS_CONSOLE_PORT" -DefaultValue "8849"
 
 Push-Location $DeployDirectory
 try {
@@ -50,7 +88,7 @@ try {
 
     Write-Host ""
     Write-Host "首次下载和初始化可能需要数分钟。"
-    Write-Host "Nacos 控制台：http://127.0.0.1:8849"
+    Write-Host "Nacos 控制台：http://127.0.0.1:$NacosConsolePort"
 }
 finally {
     Pop-Location

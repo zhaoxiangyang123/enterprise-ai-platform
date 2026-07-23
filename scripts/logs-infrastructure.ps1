@@ -2,6 +2,7 @@
     [ValidateSet("all", "mysql", "redis", "nacos")]
     [string]$Service = "all",
 
+    [ValidateRange(1, 10000)]
     [int]$Tail = 200
 )
 
@@ -35,6 +36,42 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
 
@@ -45,6 +82,10 @@ try {
     }
     else {
         & docker compose --env-file $EnvFile -f $ComposeFile logs --tail $Tail -f $Service
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "读取基础设施日志失败。"
     }
 }
 finally {

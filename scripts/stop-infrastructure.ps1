@@ -32,6 +32,42 @@ function Ensure-LocalEnv {
     }
 }
 
+function Read-DotEnv {
+    param([string]$Path)
+
+    $Values = @{}
+
+    foreach ($Line in Get-Content $Path) {
+        $Trimmed = $Line.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($Trimmed) -or $Trimmed.StartsWith("#")) {
+            continue
+        }
+
+        $Parts = $Trimmed -split "=", 2
+        if ($Parts.Count -eq 2) {
+            $Values[$Parts[0].Trim()] = $Parts[1].Trim()
+        }
+    }
+
+    return $Values
+}
+
+function Get-EnvValue {
+    param(
+        [hashtable]$Values,
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    if ($Values.ContainsKey($Name) -and
+        -not [string]::IsNullOrWhiteSpace($Values[$Name])) {
+        return $Values[$Name]
+    }
+
+    return $DefaultValue
+}
+
 Assert-DockerAvailable
 Ensure-LocalEnv
 
