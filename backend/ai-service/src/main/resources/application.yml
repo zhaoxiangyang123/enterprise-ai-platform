@@ -1,0 +1,16 @@
+server:
+  port: 8083
+  shutdown: graceful
+
+spring:
+  application:
+    name: ai-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
