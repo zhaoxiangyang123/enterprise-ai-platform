@@ -1,0 +1,33 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: http://localhost:8081
+              predicates:
+                - Path=/api/auth/**
+            - id: user-service
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/users/**
+            - id: ai-service
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/ai/**,/api/conversations/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
