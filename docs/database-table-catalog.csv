@@ -1,0 +1,44 @@
+﻿database,service,phase,status,table_name,chinese_name,purpose,field_count
+eap_user,user-service,第一迭代,已迁移,sys_tenant,租户表,保存企业或组织租户，是多租户数据隔离的根节点。,13
+eap_user,user-service,第一迭代,已迁移,sys_user,用户表,保存租户内用户资料、密码摘要和登录安全状态。,20
+eap_user,user-service,第一迭代,已迁移,sys_role,角色表,定义租户内角色，用于聚合权限。,14
+eap_user,user-service,第一迭代,已迁移,sys_permission,权限表,定义平台菜单、按钮和接口权限资源。,16
+eap_user,user-service,第一迭代,已迁移,sys_user_role,用户角色关联表,建立用户与角色的多对多关系。,6
+eap_user,user-service,第一迭代,已迁移,sys_role_permission,角色权限关联表,建立角色与权限的多对多关系。,6
+eap_ai,ai-service,第一迭代,已迁移,ai_conversation,AI 会话表,保存用户与 AI 的会话级元数据。,15
+eap_ai,ai-service,第一迭代,已迁移,ai_message,AI 消息表,保存会话中的用户、助手、系统和工具消息。,21
+eap_user,user-service,认证与组织增强,规划,sys_department,部门表,保存租户内组织树，用于用户归属和知识权限继承。,16
+eap_user,user-service,认证与组织增强,规划,sys_user_department,用户部门关联表,建立用户与部门关系，支持兼任部门和主部门。,8
+eap_user,auth-service,认证与组织增强,规划,sys_login_audit,登录审计表,记录登录成功、失败、锁定和退出事件，支持安全审计。,13
+eap_user,user-service,认证与组织增强,规划,sys_operation_audit,操作审计表,记录后台管理和高风险数据变更行为。,16
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_model_provider,模型供应商配置表,保存租户可用的模型供应商连接和安全配置。,18
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_model,模型定义表,定义聊天、向量、重排和多模态模型能力及计费参数。,25
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_prompt_template,Prompt 模板表,保存可版本化的 Prompt 业务模板元数据。,14
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_prompt_version,Prompt 版本表,保存 Prompt 内容、变量定义和模型参数的历史版本。,14
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_message_feedback,消息反馈表,记录用户对 AI 回答的评分、问题类型和修正建议。,12
+eap_ai,ai-service,模型与 Prompt 管理,规划,ai_model_call,模型调用记录表,记录每次模型调用的状态、耗时、Token 和估算成本。,25
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_knowledge_base,知识库表,保存知识库基础信息、模型选择和默认检索配置。,17
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_knowledge_base_member,知识库成员表,为用户、部门或角色授予知识库访问权限。,8
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_retrieval_config,检索配置表,保存 Top-K、阈值、混合检索和上下文预算等可调参数。,20
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_document,知识文档表,保存知识库中文档的业务元数据和处理状态。,23
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_document_version,文档版本表,保存文档每次上传或同步形成的不可变版本。,15
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_ingestion_task,知识摄取任务表,追踪文档提取、切片、向量化和索引任务。,18
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_document_chunk,文档切片表,保存文档切片文本、定位信息和向量索引引用。,19
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_retrieval_log,检索日志表,记录每次 RAG 检索使用的查询、配置、性能和结果数。,17
+eap_knowledge,knowledge-service,RAG 与知识库,规划,kb_retrieval_hit,检索命中明细表,保存每次检索命中的切片及各阶段评分。,14
+eap_knowledge,knowledge-service,RAG 评测与调优,规划,kb_evaluation_dataset,RAG 评测数据集表,保存用于知识库检索和回答质量评估的数据集。,12
+eap_knowledge,knowledge-service,RAG 评测与调优,规划,kb_evaluation_case,RAG 评测用例表,保存问题、参考答案和预期命中文档。,15
+eap_knowledge,knowledge-service,RAG 评测与调优,规划,kb_evaluation_run,RAG 评测运行表,记录一次完整评测所用配置、模型、进度和汇总指标。,15
+eap_knowledge,knowledge-service,RAG 评测与调优,规划,kb_evaluation_result,RAG 评测结果表,保存每个用例的回答、命中结果和质量指标。,15
+eap_agent,agent-service,Agent 与 MCP,规划,agent_definition,Agent 定义表,保存 Agent 的稳定身份、负责人和当前生效版本。,15
+eap_agent,agent-service,Agent 与 MCP,规划,agent_version,Agent 版本表,保存 Agent 的 Prompt、模型、知识库和运行策略快照。,17
+eap_agent,agent-service,Agent 与 MCP,规划,agent_run,Agent 运行表,记录一次 Agent 执行的输入、最终结果、状态和资源消耗。,20
+eap_agent,agent-service,Agent 与 MCP,规划,agent_run_step,Agent 运行步骤表,记录规划、模型调用、知识检索和工具调用等可观测步骤。,17
+eap_agent,agent-service,Agent 与 MCP,规划,agent_tool,Agent 工具定义表,定义本地 Java、HTTP API 和 MCP 工具的统一元数据。,21
+eap_agent,agent-service,Agent 与 MCP,规划,agent_tool_binding,Agent 工具绑定表,控制 Agent 版本允许调用哪些工具及其覆盖配置。,11
+eap_agent,agent-service,Agent 与 MCP,规划,agent_tool_call,工具调用记录表,记录 Agent 对 Java、HTTP 或 MCP 工具的每次调用。,18
+eap_agent,agent-service,Agent 与 MCP,规划,mcp_server,MCP Server 配置表,保存 MCP Server 连接方式、凭据和健康状态。,20
+eap_agent,agent-service,Agent 与 MCP,规划,mcp_tool,MCP 工具目录表,保存从 MCP Server 自动发现的工具能力。,13
+eap_agent,agent-service,Agent 与 MCP,规划,mcp_resource,MCP 资源目录表,保存从 MCP Server 发现的资源 URI 和元数据。,12
+eap_agent,agent-service,Agent 与 MCP,规划,mcp_prompt,MCP Prompt 目录表,保存从 MCP Server 发现的 Prompt 模板能力。,10
+eap_agent,agent-service,Agent 与 MCP,规划,mcp_server_sync_log,MCP 能力同步日志表,记录 MCP 工具、资源和 Prompt 目录同步结果。,13
