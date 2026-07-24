@@ -1,0 +1,25 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  data:
+    redis:
+      host: ${EAP_REDIS_HOST:127.0.0.1}
+      port: ${EAP_REDIS_PORT:6379}
+      password: ${EAP_REDIS_PASSWORD:EapRedis_2026_Local}
+      timeout: 3s
+      connect-timeout: 3s
+
+eap:
+  auth:
+    user-service-base-url: ${EAP_USER_SERVICE_URL:http://127.0.0.1:8082}
+    internal-token: ${EAP_INTERNAL_TOKEN:eap-local-internal-token-change-me}
+    jwt-issuer: ${EAP_JWT_ISSUER:enterprise-ai-platform}
+    jwt-secret-base64: ${EAP_JWT_SECRET_BASE64:RW50ZXJwcmlzZS1BSS1QbGF0Zm9ybS1KV1QtTG9jYWwtS2V5LTIwMjY=}
+    access-token-ttl: ${EAP_ACCESS_TOKEN_TTL:PT2H}
+    redis-session-prefix: "${EAP_REDIS_SESSION_PREFIX:eap:auth:session:}"
+
+logging:
+  level:
+    com.zhaoxiangyang.eap.auth: INFO

@@ -1,0 +1,14 @@
+spring:
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+eap:
+  auth:
+    user-service-base-url: http://127.0.0.1:8082
+    internal-token: test-internal-token
+    jwt-issuer: enterprise-ai-platform-test
+    jwt-secret-base64: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+    access-token-ttl: PT2H
+    redis-session-prefix: "test:eap:auth:session:"
